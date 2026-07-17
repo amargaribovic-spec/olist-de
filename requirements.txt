@@ -1,0 +1,4 @@
+# Python dependencies for the raw loader.
+# Install with:  pip install -r requirements.txt
+psycopg2-binary   # talk to PostgreSQL from Python
+python-dotenv     # read the .env connection settings
