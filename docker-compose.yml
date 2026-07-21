@@ -11,13 +11,5 @@ services:
     volumes:
       - olist_pgdata:/var/lib/postgresql/data
 
-  adminer:
-    image: adminer
-    container_name: olist_adminer
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-
 volumes:
   olist_pgdata:
