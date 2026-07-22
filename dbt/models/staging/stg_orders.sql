@@ -2,12 +2,15 @@
 -- Raw timestamps are stored as text; nullif(...,'') turns empty strings into
 -- NULL so the ::timestamp cast doesn't error on missing values.
 -- Materialized as a view (configured in dbt_project.yml).
-
 select
     order_id,
     customer_id,
     order_status,
-    nullif(order_purchase_timestamp, '')::timestamp      as order_purchase_timestamp,
-    nullif(order_delivered_customer_date, '')::timestamp as order_delivered_customer_date,
-    nullif(order_estimated_delivery_date, '')::timestamp as order_estimated_delivery_date
-from raw.orders
+    nullif(order_purchase_timestamp, '')::timestamp as order_purchase_timestamp,
+    nullif(order_approved_at, '')::timestamp as order_approved_at,
+    nullif(order_delivered_carrier_date, '')::timestamp as order_delivered_carrier_date,
+    nullif(order_delivered_customer_date, '')::timestamp
+    as order_delivered_customer_date,
+    nullif(order_estimated_delivery_date, '')::timestamp
+    as order_estimated_delivery_date
+from {{ source("olist", "orders") }}
