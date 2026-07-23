@@ -1,0 +1,15 @@
+# Connection resolved from environment variables so the SAME profile works both
+# locally (defaults -> localhost:5544) and inside Docker (compose sets
+# DB_HOST=postgres, DB_PORT=5432). dbt does not read .env; these are real env vars.
+olist:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST', 'localhost') }}"
+      port: "{{ env_var('DB_PORT', '5544') | int }}"
+      user: "{{ env_var('DB_USER', 'olist') }}"
+      password: "{{ env_var('DB_PASSWORD', 'olist') }}"
+      dbname: "{{ env_var('DB_NAME', 'olist') }}"
+      schema: "{{ env_var('DBT_SCHEMA', 'dbt_amar') }}"
+      threads: 4

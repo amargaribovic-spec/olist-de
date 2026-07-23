@@ -11,5 +11,48 @@ services:
     volumes:
       - olist_pgdata:/var/lib/postgresql/data
 
+  # Python CSV -> raw loader. Run on demand:
+  #   docker compose run --rm loader python load/load_raw.py --create
+  loader:
+    build:
+      context: .
+      dockerfile: load/Dockerfile
+    container_name: olist_loader
+    depends_on:
+      - postgres
+    environment:
+      DB_HOST: postgres   # reach Postgres over the compose network, not localhost
+      DB_PORT: 5432
+      DB_NAME: olist
+      DB_USER: olist
+      DB_PASSWORD: olist
+      DB_SCHEMA: raw
+    volumes:
+      - ./data:/app/data
+      - ./load:/app/load
+      - ./sql:/app/sql
+    profiles: ["tools"]   # not started by `up`; use `docker compose run`
+
+  # dbt runtime. Run on demand:
+  #   docker compose run --rm dbt dbt build
+  dbt:
+    build:
+      context: ./dbt
+      dockerfile: Dockerfile
+    container_name: olist_dbt
+    depends_on:
+      - postgres
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: olist
+      DB_USER: olist
+      DB_PASSWORD: olist
+      DBT_SCHEMA: dbt_amar
+    volumes:
+      - ./dbt:/dbt
+    working_dir: /dbt
+    profiles: ["tools"]   # not started by `up`; use `docker compose run`
+
 volumes:
   olist_pgdata:
