@@ -10,10 +10,10 @@ PostgreSQL, ready for **dbt** to transform.
 CSV files  ──(this repo: Extract + Load)──►  raw schema in Postgres  ──(dbt, later: Transform)──►  staging → marts
 ```
 
-- **Now (this repo):** land the 9 CSVs into a `raw` schema, exactly as-is
+- **Load (this repo):** land the 9 CSVs into a `raw` schema, exactly as-is
   (all TEXT, no constraints).
-- **Later (dbt, ~15 days):** cast types, clean, test, and model into a star
-  schema (`stg_` → `dim_` / `fct_`).
+- **Transform (dbt, in `dbt/`):** sources for all 9 raw tables, a typed staging
+  layer (`stg_`), and marts. See [`dbt/README.md`](dbt/README.md) for dbt usage.
 
 The rules we follow are in [`skills.md`](skills.md).
 
@@ -34,7 +34,7 @@ olist-de/
 ├── load/
 │   ├── config.py              # reads .env -> DB connection
 │   └── load_raw.py            # idempotent CSV -> raw loader
-└── dbt/                       # placeholder — dbt project goes here later
+└── dbt/                       # dbt project — sources, staging, marts (see dbt/README.md)
 ```
 
 ## Database — decide later, one file changes
@@ -72,6 +72,37 @@ docker compose down       # stop, keep the data
 docker compose down -v    # stop and DELETE the data (fresh start)
 docker exec -it olist_postgres psql -U olist -d olist   # open a SQL shell inside the container
 ```
+
+## Running with Docker (containerized workflow)
+
+The whole pipeline runs in containers — a fresh clone needs only Docker, no local
+Python. The `loader` and `dbt` services sit behind the `tools` compose profile,
+so `up` starts only Postgres; run the others on demand.
+
+```bash
+# 1. start Postgres
+docker compose up -d
+
+# 2. create the raw schema + load the 9 CSVs (one-off; --create builds the schema)
+docker compose run --rm loader python load/load_raw.py --create
+#    (reload only, schema already exists)
+docker compose run --rm loader
+
+# 3. install dbt packages, then build the models
+docker compose run --rm dbt dbt deps
+docker compose run --rm dbt dbt build
+
+# any other dbt command works the same way
+docker compose run --rm dbt dbt run
+docker compose run --rm dbt dbt test
+docker compose run --rm dbt dbt docs generate
+```
+
+Connection is wired via env vars: compose sets `DB_HOST=postgres` for the
+containers, while the same `dbt/profiles.yml` falls back to `localhost:5544` when
+you run dbt from the local venv — so both workflows stay in sync. The local venv
+is kept only for editor integration and fast formatting; **Docker is the source
+of truth for running the pipeline.**
 
 ## Data source
 

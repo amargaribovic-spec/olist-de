@@ -31,17 +31,19 @@ dbt build                     # run models AND their tests together
 dbt test                      # run tests only
 ```
 
-## Formatting with sqlfmt
+## Linting & formatting with sqlfluff
 
-`sqlfmt` is our auto-formatter (like Prettier/Black, but for dbt SQL). It keeps
-every model in one consistent style.
+`sqlfluff` is our single tool for both linting and formatting SQL (config in
+`.sqlfluff`: Postgres dialect + dbt templater). It checks rules (naming, layout,
+references) *and* auto-fixes style. Because it uses the dbt templater, it lints
+the real compiled SQL behind `ref()` / `source()`.
 
 ```bash
-sqlfmt models/          # format every model in place
-sqlfmt --diff models/   # preview changes without writing anything
+sqlfluff lint models/   # report rule violations (this is the CI gate)
+sqlfluff fix models/    # auto-fix what it can, in place
 ```
 
-Run it before committing so the diff stays clean.
+Run `fix` then `lint` before committing so the diff stays clean and CI-ready.
 
 ## Docs & lineage graph
 
