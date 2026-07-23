@@ -21,10 +21,14 @@ specific; the last is git/commit hygiene.
 
 ## 2. Data-engineering rules
 
-6. **Layered ELT: raw → staging → marts.**
-   - `raw`   = land the CSVs exactly as-is (this repo, now).
-   - `stg_`  = cast types, rename, light clean (dbt, later).
-   - `dim_` / `fct_` = the modelled star schema (dbt, later).
+6. **Layered ELT: raw → staging → intermediate → marts.**
+   - `raw`   = land the CSVs exactly as-is.
+   - `stg_`  = one model per source table: cast types, rename, light clean.
+     Stays 1:1 with the source (all columns, no joins, no aggregations).
+   - `int_`  = reusable middle steps: joins/aggregations shared by more than one
+     mart, or logic extracted to keep a mart readable. Only create an
+     intermediate model when the logic is actually reused — don't add empty layers.
+   - `dim_` / `fct_` (marts) = the modelled star schema, business-ready outputs.
    Never clean in the raw layer.
 7. **Raw layer is permissive.** Every raw column is TEXT, with no PK/FK/CHECK.
    Goal: a bad value can never fail the load. Typing and validation come later.
@@ -56,6 +60,27 @@ specific; the last is git/commit hygiene.
     three tables share `geolocation_zip_code_prefix` — which is also the join key
     to `geolocation`. Keep this name; do not rename back.
 
+14. **Sources: declare, never hardcode.** Every raw table is declared as a dbt
+    source in `models/staging/_src_olist.yml` (source name `olist`, schema `raw`).
+    Staging models read from `{{ source('olist', '<table>') }}` — never a
+    hardcoded `raw.<table>`. This keeps the raw layer visible in the lineage
+    graph, tracks the dependency, and puts the schema location in one place.
+
+15. **Containerize by default.** Postgres, the CSV loader, and dbt all run in
+    Docker (`docker-compose.yml`); a fresh clone needs only Docker. Run tasks with
+    `docker compose run --rm loader ...` and `docker compose run --rm dbt dbt ...`.
+    The connection is env-var driven, so the same `dbt/profiles.yml` works in a
+    container (`DB_HOST=postgres`) and from the local venv (defaults to
+    `localhost:5544`). The venv is kept only for editor integration and running
+    lint/format — Docker is the source of truth for running the pipeline.
+
+16. **Lint & format with sqlfluff (only).** `sqlfluff` (config in `dbt/.sqlfluff`:
+    Postgres dialect + dbt templater) is the single tool for both linting and
+    formatting SQL — no separate formatter. Run `sqlfluff fix models/` then
+    `sqlfluff lint models/` before committing. The same `sqlfluff lint` is the
+    intended CI gate (GitHub Actions later), so keeping models lint-clean locally
+    means CI passes on the first run.
+
 ## 3. Git & Conventional Commits
 
 Use **Conventional Commits** for every commit. Format:
@@ -75,6 +100,10 @@ Use **Conventional Commits** for every commit. Format:
 
 **Rules**
 - One logical change per commit (don't mix a feature and a docs edit).
+- **Never one big commit that bundles unrelated changes** (e.g. `feat` + `feat`
+  + `fix` together). Split the work into separate, focused commits — one type of
+  change each — so the history stays clean and each commit is revertible on its
+  own. Formatting-only runs get their own `style:` commit, separate from logic.
 - Description in the imperative ("add", "fix", not "added"/"fixes").
 - Keep the summary line short (~50 chars); add a body only if the *why* needs it.
 
@@ -102,3 +131,16 @@ Keep comments purposeful and minimal — this code is read by seniors.
 - One concise docstring per module/function is enough; no multi-paragraph
   teaching comments in the code.
 - If the code is self-explanatory, no comment beats a redundant one.
+
+## 5. Keeping these rules current
+
+This file is the project's source of truth for *how* we work. Whenever we change
+an approach, add a tool, introduce a new layer/convention, or make a decision
+worth carrying forward, **update `skills.md` in the same change** — but only if
+the rule is genuinely reusable. Judge before adding:
+
+- Add it if a future contributor (or future you) would otherwise repeat a
+  mistake or reinvent the decision (e.g. "sources, never hardcode", "run dbt via
+  docker").
+- Don't add one-off, obvious, or purely temporary notes — keep this list tight.
+- Prefer editing an existing rule over adding a near-duplicate.
