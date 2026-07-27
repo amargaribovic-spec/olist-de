@@ -24,7 +24,9 @@ specific; the last is git/commit hygiene.
 6. **Layered ELT: raw → staging → intermediate → marts.**
    - `raw`   = land the CSVs exactly as-is.
    - `stg_`  = one model per source table: cast types, rename, light clean.
-     Stays 1:1 with the source (all columns, no joins, no aggregations).
+     Stays 1:1 with the source (all columns, no joins, no aggregations). String
+     columns are cast to `varchar` (team standard), numbers/dates to their real
+     types. ZIP prefixes stay string (leading zeros).
    - `int_`  = reusable middle steps: joins/aggregations shared by more than one
      mart, or logic extracted to keep a mart readable. Only create an
      intermediate model when the logic is actually reused — don't add empty layers.
