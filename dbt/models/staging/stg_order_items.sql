@@ -1,7 +1,9 @@
--- Staging model: one row per item within an order. Casts numeric/timestamp fields.
+-- Staging model: one row per item within an order.
+-- Surrogate key from the composite natural key (order_id, order_item_id).
 select
+    {{ dbt_utils.generate_surrogate_key(['order_id', 'order_item_id']) }} as order_item_sk,
     order_id,
-    order_item_id,
+    order_item_id::int as order_item_id,
     product_id,
     seller_id,
     nullif(shipping_limit_date, '')::timestamp as shipping_limit_date,
