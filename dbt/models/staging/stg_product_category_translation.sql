@@ -1,5 +1,5 @@
 -- Staging model: Portuguese -> English product category names (lookup table).
 select
-    product_category_name,
-    product_category_name_english
+    product_category_name::varchar as product_category_name,
+    product_category_name_english::varchar as product_category_name_english
 from {{ source("olist", "product_category_translation") }}
