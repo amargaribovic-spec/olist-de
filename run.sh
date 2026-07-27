@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-#
 # run.sh — orchestrate the olist-de pipeline via Docker.
 #
 #   ./run.sh            all: up -> load (only if needed) -> build
 #   ./run.sh up         start postgres and wait until it accepts connections
 #   ./run.sh load       load raw (skips if already loaded; 'load --force' reloads)
 #   ./run.sh build      dbt deps + dbt build
+#   ./run.sh refresh    dbt deps + dbt build --full-refresh (rebuilds incrementals)
 #   ./run.sh fresh      WIPE the db volume, then up + load + build (recovery)
 #   ./run.sh down       stop containers, keep the data
 #
@@ -50,8 +50,8 @@ cmd_load() {
 cmd_build() {
     log "installing dbt packages"
     $COMPOSE run --rm dbt dbt deps
-    log "building dbt models"
-    $COMPOSE run --rm dbt dbt build
+    log "building dbt models${1:+ (full refresh)}"
+    $COMPOSE run --rm dbt dbt build ${1:-}
 }
 
 cmd_all() {
@@ -79,11 +79,12 @@ case "${1:-all}" in
     up)         cmd_up ;;
     load)       shift || true; cmd_load "${1:-}" ;;
     build|dbt)  cmd_build ;;
+    refresh)    cmd_build "--full-refresh" ;;
     all)        cmd_all ;;
     fresh)      cmd_fresh ;;
     down)       cmd_down ;;
     *)
-        echo "usage: ./run.sh [all|up|load [--force]|build|fresh|down]"
+        echo "usage: ./run.sh [all|up|load [--force]|build|refresh|fresh|down]"
         exit 1
         ;;
 esac
