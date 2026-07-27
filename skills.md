@@ -73,6 +73,9 @@ specific; the last is git/commit hygiene.
     container (`DB_HOST=postgres`) and from the local venv (defaults to
     `localhost:5544`). The venv is kept only for editor integration and running
     lint/format — Docker is the source of truth for running the pipeline.
+    The `run.sh` helper orchestrates it: `./run.sh` = up → load-if-needed → build;
+    `./run.sh fresh` = wipe volume + rebuild (recovery). Steps are idempotent — the
+    loader is skipped when `raw` already has data.
 
 16. **Lint & format with sqlfluff (only).** `sqlfluff` (config in `dbt/.sqlfluff`:
     Postgres dialect + dbt templater) is the single tool for both linting and

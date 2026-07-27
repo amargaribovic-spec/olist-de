@@ -79,6 +79,11 @@ The whole pipeline runs in containers — a fresh clone needs only Docker, no lo
 Python. The `loader` and `dbt` services sit behind the `tools` compose profile,
 so `up` starts only Postgres; run the others on demand.
 
+**Shortcut — `./run.sh`** runs the whole pipeline (start Postgres → load raw only
+if needed → build models). Other modes: `./run.sh up|load|build|down`, and
+`./run.sh fresh` to wipe the volume and rebuild from scratch (recovery). The
+manual steps below are what the script automates.
+
 ```bash
 # 1. start Postgres
 docker compose up -d
