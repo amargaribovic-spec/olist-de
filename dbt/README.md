@@ -4,7 +4,8 @@ Transforms the raw Olist e-commerce data (loaded into the `raw` schema of the
 local Postgres) into clean, typed, analytics-ready models.
 
 - **Source data:** schema `raw` (9 tables, loaded from CSV — see `../load/`)
-- **dbt output:** schema `dbt_amar`
+- **dbt output:** each layer builds into its own schema — `staging`, `intermediate`,
+  `marts` (via a `generate_schema_name` override; names used as-is, not prefixed).
 - **Layers:** `models/staging/` (1:1 cleaned sources) → `models/intermediate/`
   (reusable joins/logic) → `models/marts/` (business-ready outputs)
 

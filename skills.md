@@ -84,6 +84,13 @@ specific; the last is git/commit hygiene.
     intended CI gate (GitHub Actions later), so keeping models lint-clean locally
     means CI passes on the first run.
 
+17. **One schema per layer.** Each dbt layer builds into its own Postgres schema:
+    `staging`, `intermediate`, `marts` (source data stays in `raw`). Set via
+    `+schema:` in `dbt_project.yml` plus a `generate_schema_name` macro override so
+    the names are used AS-IS (dbt's default would prefix them, e.g.
+    `dbt_amar_staging`). Add `+schema: intermediate` when the intermediate layer
+    gets its first model.
+
 ## 3. Git & Conventional Commits
 
 Use **Conventional Commits** for every commit. Format:
