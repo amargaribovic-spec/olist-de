@@ -143,6 +143,11 @@ Keep comments purposeful and minimal — this code is read by seniors.
 - One concise docstring per module/function is enough; no multi-paragraph
   teaching comments in the code.
 - If the code is self-explanatory, no comment beats a redundant one.
+- **dbt models:** keep inline SQL comments to ~one purposeful line — the
+  non-obvious *why* (a filter's reason, a data quirk, "mirrors the notebook").
+  Put model/column *documentation* (what it is, grain, purpose) in YAML
+  `description:` fields — it feeds `dbt docs` + the lineage graph. Never write
+  "reused by X" comments: the lineage graph already shows dependencies.
 
 ## 5. Keeping these rules current
 
