@@ -25,8 +25,10 @@ specific; the last is git/commit hygiene.
    - `raw`   = land the CSVs exactly as-is.
    - `stg_`  = one model per source table: cast types, rename, light clean.
      Stays 1:1 with the source (all columns, no joins, no aggregations). String
-     columns are cast to `varchar` (team standard), numbers/dates to their real
-     types. ZIP prefixes stay string (leading zeros).
+     columns are cast to `varchar(n)` with a **realistic length cap** the data
+     won't hit (state `varchar(2)`, IDs/surrogate keys `varchar(32)`, city/category
+     `varchar(100)`, etc.); numbers/dates to their real types. ZIP prefixes stay
+     string (leading zeros).
    - `int_`  = reusable middle steps: joins/aggregations shared by more than one
      mart, or logic extracted to keep a mart readable. Only create an
      intermediate model when the logic is actually reused — don't add empty layers.
@@ -107,6 +109,12 @@ specific; the last is git/commit hygiene.
     - **Combining same-grain aggregates** in a mart (e.g. customer counts + seller
       counts per state) is acceptable Gold assembly — that is not an
       entity-conforming join.
+
+19. **Reproduce the source analyses faithfully.** The marts rebuild the
+    `FEP-DE/olist-analytics` notebooks. Match what each notebook actually did — if
+    the notebook reported "top 10 cities", the mart is `... limit 10` (a limit is
+    trivial to remove later to get the full table back). Keep the mart's framing
+    (top-N, buckets, segments) close to the notebook's analysis.
 
 ## 3. Git & Conventional Commits
 
