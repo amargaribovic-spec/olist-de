@@ -1,0 +1,72 @@
+version: 2
+
+models:
+  - name: stg_customers
+    columns:
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+      - name: customer_unique_id
+        tests:
+          - not_null
+
+  - name: stg_orders
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        tests:
+          - not_null
+
+  - name: stg_order_items
+    columns:
+      - name: order_item_sk
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_order_payments
+    columns:
+      - name: payment_sk
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_order_reviews
+    columns:
+      - name: review_sk
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_products
+    columns:
+      - name: product_id
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_sellers
+    columns:
+      - name: seller_id
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_product_category_translation
+    columns:
+      - name: product_category_name
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_geolocation
+    # zip_code_prefix is NOT unique here (many geo points per zip) — dedup happens
+    # in the intermediate layer later, so we only assert not_null for now.
+    columns:
+      - name: zip_code_prefix
+        tests:
+          - not_null
