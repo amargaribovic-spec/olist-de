@@ -93,6 +93,21 @@ specific; the last is git/commit hygiene.
     `dbt_amar_staging`). Add `+schema: intermediate` when the intermediate layer
     gets its first model.
 
+18. **Medallion architecture.** The layers ARE Bronze / Silver / Gold:
+    - **Bronze** = `raw` schema — ingested as-is, all TEXT, no rules.
+    - **Silver** = `staging` (type, rename, clean, null-handling; 1:1 with source)
+      **+** `intermediate` (dedup, grain changes, entity-level joins / enrichment).
+    - **Gold** = `marts` — aggregate to a business grain for consumption.
+
+    Rules:
+    - A mart **never reads from `raw`** — always from Silver (staging/intermediate).
+    - **Cleaning, dedup, grain changes and entity-conforming joins live in Silver**
+      (so marts stay mostly aggregation). If a mart needs a real join/reshape, do it
+      in an intermediate first.
+    - **Combining same-grain aggregates** in a mart (e.g. customer counts + seller
+      counts per state) is acceptable Gold assembly — that is not an
+      entity-conforming join.
+
 ## 3. Git & Conventional Commits
 
 Use **Conventional Commits** for every commit. Format:
