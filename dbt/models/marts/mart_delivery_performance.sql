@@ -1,6 +1,4 @@
--- Mart (NB01): one row per delivered order with a valid timeline, plus its
--- delivery-stage durations and lateness. Summary stats (mean/median, % late)
--- are computed on top of this in BI / ad-hoc queries.
+-- NB01: valid delivered orders with their delivery metrics.
 with delivery as (
 
     select * from {{ ref('int_order_delivery') }}
