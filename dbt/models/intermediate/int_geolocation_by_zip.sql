@@ -1,3 +1,4 @@
+{{ config(materialized="table") }}
 -- One representative point per zip: Brazil-bbox filter (drops bad coords), then mean lat/lng.
 with geo as (
 

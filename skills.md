@@ -109,6 +109,13 @@ specific; the last is git/commit hygiene.
     - **Combining same-grain aggregates** in a mart (e.g. customer counts + seller
       counts per state) is acceptable Gold assembly — that is not an
       entity-conforming join.
+    - **Materialization:** staging = `view`, marts = `table`. Intermediate defaults
+      to `view`, overridden per-model to `table`
+      (`{{ config(materialized="table") }}`) when a model is **reused by several
+      marts, expensive, or joined** — a windowed/complex intermediate left as a
+      view causes O(n^2) join blow-ups (a mart joining it re-runs the window on
+      every row). Simple single-use intermediates stay views. Avoid `ephemeral`
+      for windowed/joined logic (it inlines and re-computes in each consumer).
 
 19. **Reproduce the source analyses faithfully.** The marts rebuild the
     `FEP-DE/olist-analytics` notebooks. Match what each notebook actually did — if

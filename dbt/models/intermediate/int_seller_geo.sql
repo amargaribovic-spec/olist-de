@@ -1,3 +1,4 @@
+{{ config(materialized="table") }}
 -- Sellers + lat/lng from their zip prefix.
 with sellers as (
 

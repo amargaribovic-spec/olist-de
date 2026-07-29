@@ -1,3 +1,4 @@
+{{ config(materialized="table") }}
 -- Order items + product category (English, else Portuguese, else 'uncategorized').
 with items as (
 

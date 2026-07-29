@@ -1,3 +1,4 @@
+{{ config(materialized="table") }}
 -- Delivery-stage durations (days) per delivered order. Invalid timelines are
 -- flagged (not dropped) so each downstream mart filters as it needs.
 with orders as (

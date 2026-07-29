@@ -1,3 +1,4 @@
+{{ config(materialized="table") }}
 -- Customers + lat/lng from their zip prefix.
 with customers as (
 
