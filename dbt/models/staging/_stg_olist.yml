@@ -10,6 +10,20 @@ models:
       - name: customer_unique_id
         tests:
           - not_null
+      - name: zip_code_prefix
+        tests:
+          - not_null
+      - name: customer_city
+        tests:
+          - not_null
+      - name: customer_state
+        tests:
+          - not_null
+          # Every customer state must map to a region in the seed.
+          - relationships:
+              arguments:
+                to: ref('state_region')
+                field: state
 
   - name: stg_orders
     columns:
@@ -20,6 +34,30 @@ models:
       - name: customer_id
         tests:
           - not_null
+          # Almost 1:1 with orders — exactly one customer_id appears on two orders.
+          # Kept as a warn so the known exception stays visible and we'd notice if
+          # it ever grew, rather than silently dropping the assertion.
+          - unique:
+              config:
+                severity: warn
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: order_status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - delivered
+                  - shipped
+                  - canceled
+                  - unavailable
+                  - invoiced
+                  - processing
+                  - created
+                  - approved
 
   - name: stg_order_items
     columns:
@@ -27,6 +65,47 @@ models:
         tests:
           - unique
           - not_null
+      - name: order_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: order_item_id
+        tests:
+          - not_null
+      - name: product_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+      - name: seller_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_sellers')
+                field: seller_id
+      - name: shipping_limit_date
+        tests:
+          - not_null
+      - name: price
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+      - name: freight_value
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
 
   - name: stg_order_payments
     columns:
@@ -34,12 +113,70 @@ models:
         tests:
           - unique
           - not_null
+      - name: order_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: payment_sequential
+        tests:
+          - not_null
+      - name: payment_type
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - credit_card
+                  - boleto
+                  - voucher
+                  - debit_card
+                  - not_defined
+      - name: payment_installments
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+      - name: payment_value
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
 
   - name: stg_order_reviews
     columns:
       - name: review_sk
         tests:
           - unique
+          - not_null
+      - name: review_id
+        tests:
+          - not_null
+      - name: order_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: review_score
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+                quote: false
+      - name: review_creation_date
+        tests:
+          - not_null
+      - name: review_answer_timestamp
+        tests:
           - not_null
 
   - name: stg_products
@@ -48,6 +185,17 @@ models:
         tests:
           - unique
           - not_null
+      # product_category_name has known gaps in the source, so no not_null here.
+      # It links to the translation table, but a handful of categories are missing
+      # a translation — surfaced as a warning rather than a hard failure.
+      - name: product_category_name
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_product_category_translation')
+                field: product_category_name
+              config:
+                severity: warn
 
   - name: stg_sellers
     columns:
@@ -55,10 +203,27 @@ models:
         tests:
           - unique
           - not_null
+      - name: zip_code_prefix
+        tests:
+          - not_null
+      - name: seller_city
+        tests:
+          - not_null
+      - name: seller_state
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('state_region')
+                field: state
 
   - name: stg_product_category_translation
     columns:
       - name: product_category_name
+        tests:
+          - unique
+          - not_null
+      - name: product_category_name_english
         tests:
           - unique
           - not_null

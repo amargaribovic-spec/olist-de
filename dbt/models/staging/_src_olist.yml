@@ -5,12 +5,41 @@ sources:
     schema: raw
     description: "Raw Olist e-commerce data, loaded as-is from the source CSVs (all columns TEXT)."
     tables:
+      # Natural keys are validated at the source so ingestion problems surface
+      # before they propagate into staging. Keys that are non-unique in the raw
+      # data (order_items, order_payments, order_reviews) get a surrogate key and
+      # are tested in staging instead.
       - name: customers
+        columns:
+          - name: customer_id
+            tests:
+              - unique
+              - not_null
       - name: geolocation
       - name: order_items
       - name: order_payments
       - name: order_reviews
       - name: orders
+        columns:
+          - name: order_id
+            tests:
+              - unique
+              - not_null
       - name: product_category_translation
+        columns:
+          - name: product_category_name
+            tests:
+              - unique
+              - not_null
       - name: products
+        columns:
+          - name: product_id
+            tests:
+              - unique
+              - not_null
       - name: sellers
+        columns:
+          - name: seller_id
+            tests:
+              - unique
+              - not_null
