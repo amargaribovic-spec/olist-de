@@ -1,0 +1,227 @@
+version: 2
+
+models:
+  - name: int_order_delivery
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      # is_late is NULL for the 8 delivered orders that never got a customer
+      # delivery date. Kept as a warn so that count stays visible; the
+      # valid-timeline filter drops them downstream anyway.
+      - name: is_late
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: is_valid_timeline
+        tests:
+          - not_null
+
+  - name: int_geolocation_by_zip
+    columns:
+      - name: zip_code_prefix
+        tests:
+          - unique
+          - not_null
+      - name: latitude
+        tests:
+          - not_null
+          # Kept inside Brazil's bounding box by the bbox filter upstream.
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -34
+                max_value: 6
+      - name: longitude
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -74
+                max_value: -33
+
+  - name: int_customer_geo
+    columns:
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+
+  - name: int_seller_geo
+    columns:
+      - name: seller_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_sellers')
+                field: seller_id
+
+  - name: int_order_geo
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+
+  - name: int_order_item_totals
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: order_total
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+      - name: freight_total
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+      - name: item_count
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+
+  - name: int_order_items_categorized
+    columns:
+      - name: order_item_sk
+        tests:
+          - unique
+          - not_null
+      - name: order_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: product_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+      # coalesce guarantees a value; 'uncategorized' is the fallback.
+      - name: category
+        tests:
+          - not_null
+
+  - name: int_order_items_regional
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: customer_region
+        tests:
+          - accepted_values:
+              arguments:
+                values: [North, Northeast, Central-West, Southeast, South]
+      - name: seller_region
+        tests:
+          - accepted_values:
+              arguments:
+                values: [North, Northeast, Central-West, Southeast, South]
+
+  - name: int_order_payments_aggregated
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: number_of_payments
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+
+  - name: int_order_seller
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: seller_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_sellers')
+                field: seller_id
+
+  - name: int_orders_with_unique_customer
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+      - name: customer_unique_id
+        tests:
+          - not_null
+      - name: order_status
+        tests:
+          - not_null
+
+  - name: int_reviews_deduped
+    columns:
+      - name: review_sk
+        tests:
+          - unique
+          - not_null
+      # Deduped to exactly one review per order.
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: review_score
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+                quote: false
