@@ -1,0 +1,21 @@
+version: 2
+
+seeds:
+  - name: state_region
+    description: "Maps each of the 27 Brazilian states to one of the 5 macro-regions."
+    columns:
+      - name: state
+        tests:
+          - unique
+          - not_null
+      - name: region
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - North
+                  - Northeast
+                  - Central-West
+                  - Southeast
+                  - South
