@@ -1,0 +1,533 @@
+version: 2
+
+models:
+  - name: mart_category_demand_by_region
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - customer_region
+              - category
+    columns:
+      - name: customer_region
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [North, Northeast, Central-West, Southeast, South]
+      - name: category
+        tests:
+          - not_null
+      - name: item_count
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: revenue
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+      - name: from_southeast_pct
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: local_pct
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+
+  - name: mart_category_performance
+    columns:
+      - name: category
+        tests:
+          - unique
+          - not_null
+      - name: items_sold
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: revenue
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+      - name: revenue_pct
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+          - sum_equals:
+              arguments:
+                expected: 100
+                tolerance: 0.5
+
+  - name: mart_concentration_by_city
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - city
+              - state
+    columns:
+      - name: customer_count
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+      - name: seller_count
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+
+  - name: mart_concentration_by_state
+    columns:
+      - name: state
+        tests:
+          - unique
+          - not_null
+      - name: customer_pct
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+          - sum_equals:
+              arguments:
+                expected: 100
+                tolerance: 0.2
+      - name: seller_pct
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+          - sum_equals:
+              arguments:
+                expected: 100
+                tolerance: 0.2
+
+  - name: mart_customer_retention
+    columns:
+      - name: customer_unique_id
+        tests:
+          - unique
+          - not_null
+      - name: number_of_orders
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: is_repeat
+        tests:
+          - not_null
+
+  - name: mart_customer_seller_distance
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: same_state
+        tests:
+          - not_null
+      - name: distance_km
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+      - name: review_score
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+                quote: false
+      - name: distance_km_bucket
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["0000-0050", "0050-0200", "0200-0500", "0500-1000", "1000+"]
+
+  - name: mart_delivery_performance
+    tests:
+      # Stage durations must reconcile to the end-to-end total, and each leg of a
+      # valid timeline must be strictly positive.
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "abs(days_total - (days_approval + days_carrier + days_last_mile)) < 0.0001"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "days_approval >= 0 and days_carrier > 0 and days_last_mile > 0"
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: is_late
+        tests:
+          - not_null
+      - name: days_total
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+
+  - name: mart_delivery_satisfaction
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+      - name: is_late
+        tests:
+          - not_null
+      - name: review_score
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+                quote: false
+      - name: delivery_days_bucket
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["00-05", "05-10", "10-15", "15-20", "20-30", "30+"]
+
+  - name: mart_density_by_zip
+    columns:
+      - name: zip_code_prefix
+        tests:
+          - unique
+          - not_null
+      - name: latitude
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -34
+                max_value: 6
+      - name: longitude
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -74
+                max_value: -33
+      - name: customer_count
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+      - name: seller_count
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+
+  - name: mart_orders_by_month
+    columns:
+      - name: order_month
+        tests:
+          - unique
+          - not_null
+      - name: order_count
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+
+  - name: mart_orders_by_status
+    columns:
+      - name: order_status
+        tests:
+          - unique
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - delivered
+                  - shipped
+                  - canceled
+                  - unavailable
+                  - invoiced
+                  - processing
+                  - created
+                  - approved
+      - name: order_count
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: order_pct
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+          - sum_equals:
+              arguments:
+                expected: 100
+                tolerance: 0.05
+
+  - name: mart_orders_by_weekday
+    columns:
+      - name: weekday_number
+        tests:
+          - unique
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 6
+      - name: weekday_name
+        tests:
+          - not_null
+      - name: order_count
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+
+  - name: mart_payment_by_order
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: number_of_payments
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: is_multi_payment
+        tests:
+          - not_null
+      - name: is_multi_type
+        tests:
+          - not_null
+
+  - name: mart_payment_by_type
+    columns:
+      - name: payment_type
+        tests:
+          - unique
+          - not_null
+          # 'not_defined' is filtered out of this mart.
+          - accepted_values:
+              arguments:
+                values: [credit_card, boleto, voucher, debit_card]
+      - name: transaction_count
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: unique_orders
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: transaction_pct
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+          - sum_equals:
+              arguments:
+                expected: 100
+                tolerance: 0.05
+      - name: revenue_pct
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+          - sum_equals:
+              arguments:
+                expected: 100
+                tolerance: 0.05
+
+  - name: mart_regional_demand
+    columns:
+      - name: customer_region
+        tests:
+          - unique
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [North, Northeast, Central-West, Southeast, South]
+      - name: item_count
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: revenue
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+      - name: from_southeast_pct
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: local_pct
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+
+  - name: mart_regional_supply_flow
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - customer_region
+              - seller_region
+    columns:
+      - name: customer_region
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [North, Northeast, Central-West, Southeast, South]
+      - name: seller_region
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [North, Northeast, Central-West, Southeast, South]
+      - name: item_count
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: pct_of_region_demand
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+          # Within each customer region the shares must sum to 100%.
+          - sum_equals:
+              arguments:
+                group_by: [customer_region]
+                expected: 100
+                tolerance: 0.05
+
+  - name: mart_review_response_time
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+      - name: review_score
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+                quote: false
+      - name: response_hours
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+      - name: response_days
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+      - name: response_days_bucket
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["0-1", "1-2", "2-3", "3-7", "7+"]
+
+  - name: mart_review_scores
+    columns:
+      - name: review_score
+        tests:
+          - unique
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+                quote: false
+      - name: review_count
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: review_pct
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+          - sum_equals:
+              arguments:
+                expected: 100
+                tolerance: 0.05
+      - name: comment_rate
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
