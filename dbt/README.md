@@ -32,6 +32,30 @@ dbt build                     # run models AND their tests together
 dbt test                      # run tests only
 ```
 
+## Testing & data quality
+
+The project is tested at **every layer** (`dbt test`, or `dbt build` to run models
+and their tests together). Generic tests use the dbt 1.10 `arguments:` syntax.
+
+- **Sources** — `unique` / `not_null` on natural keys, so ingestion issues surface
+  before staging.
+- **Staging** — PK uniqueness, foreign-key `relationships` across all tables,
+  `accepted_values` on enums, `accepted_range` on numerics.
+- **Intermediate** — grain uniqueness, relationships back to staging, geo
+  coordinates bounded to Brazil.
+- **Marts** — grain (single + `unique_combination_of_columns`), every percentage
+  bounded 0–100, counts ≥ 0, bucket/enum values, and delivery-leg reconciliation.
+- **Singular tests** (`tests/`) — cross-model reconciliation (e.g. the status /
+  month / weekday breakdowns tie back to `stg_orders`; the three region marts tie
+  out per region).
+- **Reusable generic test** (`tests/generic/sum_equals.sql`) — asserts a column
+  sums to a target (optionally per group), applied to every percentage column.
+
+Three checks are intentionally set to **`warn`** (real, tolerated data facts, kept
+visible rather than hidden): one `customer_id` appears on two orders; 8 delivered
+orders have no delivery date (so `is_late` is null); two product categories have no
+English translation.
+
 ## Linting & formatting with sqlfluff
 
 `sqlfluff` is our single tool for both linting and formatting SQL (config in

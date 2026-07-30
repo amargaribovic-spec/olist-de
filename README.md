@@ -13,7 +13,8 @@ CSV files  ──(this repo: Extract + Load)──►  raw schema in Postgres  �
 - **Load (this repo):** land the 9 CSVs into a `raw` schema, exactly as-is
   (all TEXT, no constraints).
 - **Transform (dbt, in `dbt/`):** sources for all 9 raw tables, a typed staging
-  layer (`stg_`), and marts. See [`dbt/README.md`](dbt/README.md) for dbt usage.
+  layer (`stg_`), an intermediate layer (reusable joins/logic), marts, and a test
+  suite across every layer. See [`dbt/README.md`](dbt/README.md) for dbt usage.
 
 The rules we follow are in [`skills.md`](skills.md).
 
@@ -80,9 +81,10 @@ Python. The `loader` and `dbt` services sit behind the `tools` compose profile,
 so `up` starts only Postgres; run the others on demand.
 
 **Shortcut — `./run.sh`** runs the whole pipeline (start Postgres → load raw only
-if needed → build models). Other modes: `./run.sh up|load|build|down`, and
-`./run.sh fresh` to wipe the volume and rebuild from scratch (recovery). The
-manual steps below are what the script automates.
+if needed → build models). Other modes: `./run.sh up|load|build|refresh|down`,
+where `refresh` rebuilds with `--full-refresh`, and `./run.sh fresh` wipes the
+volume and rebuilds from scratch (recovery). The manual steps below are what the
+script automates.
 
 ```bash
 # 1. start Postgres
