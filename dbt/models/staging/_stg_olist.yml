@@ -185,7 +185,12 @@ models:
           - not_null
       - name: review_answer_timestamp
         tests:
-          - not_null
+          # WARN not error: the answer timestamp is legitimately absent for a
+          # recently-created review whose survey has not been answered yet, so
+          # incoming data can carry nulls here without the pipeline breaking.
+          - not_null:
+              config:
+                severity: warn
 
   - name: stg_products
     columns:
