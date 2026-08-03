@@ -5,7 +5,8 @@ with orders as (
 
     select
         order_id,
-        customer_id
+        customer_id,
+        _loaded_at
     from {{ ref('stg_orders') }}
 
 ),
@@ -48,7 +49,8 @@ select
     cust.latitude as customer_latitude,
     cust.longitude as customer_longitude,
     sell.latitude as seller_latitude,
-    sell.longitude as seller_longitude
+    sell.longitude as seller_longitude,
+    o._loaded_at
 from orders as o
 inner join order_seller as os on o.order_id = os.order_id
 inner join cust on o.customer_id = cust.customer_id

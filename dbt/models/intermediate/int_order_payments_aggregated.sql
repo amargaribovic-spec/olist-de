@@ -12,6 +12,7 @@ select
     max(payment_sequential) as max_payment_sequential,
     max(payment_installments) as max_installments,
     sum(payment_value) as total_payment_value,
-    string_agg(distinct payment_type, ', ' order by payment_type) as payment_types
+    string_agg(distinct payment_type, ', ' order by payment_type) as payment_types,
+    max(_loaded_at) as _loaded_at
 from payments
 group by order_id
