@@ -22,7 +22,9 @@ import argparse
 from config import get_connection, RAW_SCHEMA
 
 HERE          = os.path.dirname(__file__)
-DATA_DIR      = os.path.join(HERE, "..", "data")
+# Data root is configurable (OLIST_DATA_DIR) so CI / tests can point at a
+# throwaway directory instead of the repo's data/.
+DATA_DIR      = os.environ.get("OLIST_DATA_DIR") or os.path.join(HERE, "..", "data")
 RAW_DIR       = os.path.join(DATA_DIR, "raw")
 INCOMING_DIR  = os.path.join(DATA_DIR, "incoming")
 PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
