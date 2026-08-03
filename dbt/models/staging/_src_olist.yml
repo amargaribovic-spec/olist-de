@@ -5,15 +5,14 @@ sources:
     schema: raw
     description: "Raw Olist e-commerce data, loaded as-is from the source CSVs (all columns TEXT)."
     tables:
-      # Natural keys are validated at the source so ingestion problems surface
-      # before they propagate into staging. Keys that are non-unique in the raw
-      # data (order_items, order_payments, order_reviews) get a surrogate key and
-      # are tested in staging instead.
+      # Raw is an APPEND-ONLY landing zone: a key can legitimately appear more than
+      # once over time (an updated record arrives as a new row with a later
+      # _loaded_at). So uniqueness is NOT asserted here — it's enforced in staging
+      # after dedup-to-latest. At the source we only require keys to be present.
       - name: customers
         columns:
           - name: customer_id
             tests:
-              - unique
               - not_null
       - name: geolocation
       - name: order_items
@@ -23,23 +22,19 @@ sources:
         columns:
           - name: order_id
             tests:
-              - unique
               - not_null
       - name: product_category_translation
         columns:
           - name: product_category_name
             tests:
-              - unique
               - not_null
       - name: products
         columns:
           - name: product_id
             tests:
-              - unique
               - not_null
       - name: sellers
         columns:
           - name: seller_id
             tests:
-              - unique
               - not_null

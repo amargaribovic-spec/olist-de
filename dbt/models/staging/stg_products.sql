@@ -1,5 +1,15 @@
 -- Staging model: product catalogue. Casts numeric dimensions.
 -- Source keeps the original misspelling "lenght"; renamed to correct "length" here.
+-- Append-only raw → keep the latest row per product_id.
+with source as (
+
+    select
+        *,
+        row_number() over (partition by product_id order by _loaded_at desc) as _rn
+    from {{ source("olist", "products") }}
+
+)
+
 select
     product_id::varchar(32) as product_id,
     nullif(product_name_lenght, '')::int as product_name_length,
@@ -9,5 +19,7 @@ select
     nullif(product_length_cm, '')::numeric as product_length_cm,
     nullif(product_height_cm, '')::numeric as product_height_cm,
     nullif(product_width_cm, '')::numeric as product_width_cm,
-    ({{ clean_text('product_category_name') }})::varchar(100) as product_category_name
-from {{ source("olist", "products") }}
+    ({{ clean_text('product_category_name') }})::varchar(100) as product_category_name,
+    _loaded_at
+from source
+where _rn = 1
