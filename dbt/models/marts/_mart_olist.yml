@@ -286,6 +286,8 @@ models:
                   - processing
                   - created
                   - approved
+              config:
+                severity: warn
       - name: order_count
         tests:
           - not_null
@@ -355,10 +357,13 @@ models:
         tests:
           - unique
           - not_null
-          # 'not_defined' is filtered out of this mart.
+          # 'not_defined' is filtered out of this mart. WARN not error so a new,
+          # valid payment_type surfaces without breaking the build.
           - accepted_values:
               arguments:
                 values: [credit_card, boleto, voucher, debit_card]
+              config:
+                severity: warn
       - name: transaction_count
         tests:
           - dbt_utils.accepted_range:

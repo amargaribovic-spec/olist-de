@@ -47,6 +47,8 @@ models:
       - name: order_status
         tests:
           - not_null
+          # WARN not error: Olist could introduce a new, valid status — we want to
+          # be alerted, not have the pipeline break on new incoming data.
           - accepted_values:
               arguments:
                 values:
@@ -58,6 +60,8 @@ models:
                   - processing
                   - created
                   - approved
+              config:
+                severity: warn
 
   - name: stg_order_items
     columns:
@@ -126,6 +130,8 @@ models:
       - name: payment_type
         tests:
           - not_null
+          # WARN not error: a new, valid payment_type (e.g. pix) must not break
+          # the pipeline on new incoming data.
           - accepted_values:
               arguments:
                 values:
@@ -134,6 +140,8 @@ models:
                   - voucher
                   - debit_card
                   - not_defined
+              config:
+                severity: warn
       - name: payment_installments
         tests:
           - not_null
