@@ -1,6 +1,10 @@
-# data
+# data — CSVs and generated batches are not tracked; keep the dirs via .gitkeep
 data/raw/*
 !data/raw/.gitkeep
+data/incoming/*
+!data/incoming/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
 
 # secrets
 .env
