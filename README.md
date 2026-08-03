@@ -94,6 +94,18 @@ To **block merges until lint passes**, mark the `sqlfluff lint (dbt models)` che
 as **Required** in the branch-protection rule for `main`
 (Settings → Branches → Branch protection rules).
 
+[`.github/workflows/pipeline.yml`](.github/workflows/pipeline.yml) runs the whole
+pipeline end-to-end on every PR, on a **synthetic dataset** (no real CSVs needed —
+`load/generate_seed_dataset.py` builds a tiny, referentially-consistent 9-table
+set from scratch). It exercises both flows:
+
+1. **fresh** — generate the seed → `load --full` → `dbt build --full-refresh` →
+   test. Proves a clean first-ever run.
+2. **incremental-drift** — a "next-year" batch with a new `order_status`, a new
+   `payment_type` and re-emitted (updated) orders → `load --append` → incremental
+   `dbt build`. Proves new data merges in and drift **warns instead of erroring** —
+   the pipeline bends, it does not break.
+
 ## Structure
 
 ```
