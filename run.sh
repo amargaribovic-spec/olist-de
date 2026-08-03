@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
 # run.sh — orchestrate the olist-de pipeline via Docker.
 #
-#   ./run.sh            all: up -> load (only if needed) -> build
-#   ./run.sh up         start postgres and wait until it accepts connections
-#   ./run.sh load       load raw (skips if already loaded; 'load --force' reloads)
-#   ./run.sh build      dbt deps + dbt build
-#   ./run.sh refresh    dbt deps + dbt build --full-refresh (rebuilds incrementals)
-#   ./run.sh fresh      WIPE the db volume, then up + load + build (recovery)
-#   ./run.sh down       stop containers, keep the data
+# Two ingestion modes, built for continuous data arriving from Olist:
+#
+#   ./run.sh fresh        WIPE everything and rebuild as if running the first time
+#                         (down -v -> up -> full load -> dbt build --full-refresh)
+#   ./run.sh build        continue: load only NEW batches, then incremental dbt build
+#
+#   ./run.sh              all: up -> load (full if empty, else new batches) -> build
+#   ./run.sh up           start postgres and wait until it accepts connections
+#   ./run.sh load         load only new batches from data/incoming/ (append)
+#   ./run.sh load-full    clean full load (truncate + canonical + replay batches)
+#   ./run.sh generate ..  generate a fake Olist batch into data/incoming/
+#                         e.g. ./run.sh generate --orders 500 --new-status --seed 42
+#   ./run.sh build-only   dbt deps + dbt build (no loading)
+#   ./run.sh refresh      dbt deps + dbt build --full-refresh (rebuild incrementals)
+#   ./run.sh down         stop containers, keep the data
 #
 set -euo pipefail
 cd "$(dirname "$0")"                      # always run from the repo root
@@ -38,16 +46,22 @@ cmd_up() {
     wait_for_pg
 }
 
-cmd_load() {
-    if raw_loaded && [[ "${1:-}" != "--force" ]]; then
-        log "raw already loaded (raw.orders has rows) — skipping. Use './run.sh load --force' to reload."
-    else
-        log "loading raw CSVs (create schema + load)"
-        $COMPOSE run --rm loader python load/load_raw.py --create
-    fi
+cmd_load() {        # incremental: append only new batches
+    log "loading new batches (append)"
+    $COMPOSE run --rm loader python load/load_raw.py --append
 }
 
-cmd_build() {
+cmd_load_full() {   # clean full load
+    log "full load (truncate + canonical + replay batches)"
+    $COMPOSE run --rm loader python load/load_raw.py --full
+}
+
+cmd_generate() {    # generate a fake batch into data/incoming/
+    log "generating fake Olist batch"
+    $COMPOSE run --rm loader python load/generate_fake_batch.py "$@"
+}
+
+cmd_build() {       # dbt deps + build (optionally --full-refresh)
     log "installing dbt packages"
     $COMPOSE run --rm dbt dbt deps
     log "building dbt models${1:+ (full refresh)}"
@@ -56,17 +70,24 @@ cmd_build() {
 
 cmd_all() {
     cmd_up
-    cmd_load
+    if raw_loaded; then cmd_load; else cmd_load_full; fi
     cmd_build
     log "pipeline complete ✅"
 }
 
-cmd_fresh() {
-    log "WIPING the database volume and rebuilding from scratch"
+cmd_build_incremental() {   # the mentor's "build": continue with new info
+    cmd_up
+    cmd_load
+    cmd_build
+    log "incremental build complete ✅"
+}
+
+cmd_fresh() {               # the mentor's "full refresh": like running the first time
+    log "WIPING the database volume → clean first-run rebuild"
     $COMPOSE down -v
     cmd_up
-    $COMPOSE run --rm loader python load/load_raw.py --create   # always load on a fresh volume
-    cmd_build
+    cmd_load_full
+    cmd_build "--full-refresh"
     log "fresh rebuild complete ✅"
 }
 
@@ -76,15 +97,18 @@ cmd_down() {
 }
 
 case "${1:-all}" in
-    up)         cmd_up ;;
-    load)       shift || true; cmd_load "${1:-}" ;;
-    build|dbt)  cmd_build ;;
-    refresh)    cmd_build "--full-refresh" ;;
-    all)        cmd_all ;;
-    fresh)      cmd_fresh ;;
-    down)       cmd_down ;;
+    up)                 cmd_up ;;
+    load)               cmd_load ;;
+    load-full)          cmd_load_full ;;
+    generate)           shift || true; cmd_generate "$@" ;;
+    build)              cmd_build_incremental ;;
+    build-only|dbt)     cmd_build ;;
+    refresh)            cmd_up; cmd_build "--full-refresh" ;;
+    all)                cmd_all ;;
+    fresh|full-refresh) cmd_fresh ;;
+    down)               cmd_down ;;
     *)
-        echo "usage: ./run.sh [all|up|load [--force]|build|refresh|fresh|down]"
+        echo "usage: ./run.sh [all|fresh|build|up|load|load-full|generate ..|build-only|refresh|down]"
         exit 1
         ;;
 esac
