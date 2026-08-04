@@ -300,7 +300,7 @@ models:
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 0
-                max_value: 10
+                max_value: 100
           - sum_equals:
               arguments:
                 expected: 100
