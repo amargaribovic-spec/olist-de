@@ -2,7 +2,7 @@
 -- Append-only raw → keep the latest row per customer_id.
 with source as (
 
-    SELECT
+    select
         *,
         row_number() over (partition by customer_id order by _loaded_at desc) as _rn
     from {{ source("olist", "customers") }}
