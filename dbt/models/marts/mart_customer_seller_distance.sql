@@ -1,9 +1,14 @@
+{{ config(materialized="incremental", unique_key="order_id",
+          incremental_strategy="merge", on_schema_change="sync_all_columns") }}
 -- NB09: customer<->seller distance per order, with freight, delivery and review.
 -- distance_km via the haversine formula; bucket bins match the notebook (0/50/200/500/1000/inf).
+-- Incremental: merge new/updated orders (by geo _loaded_at) keyed on order_id.
 with geo as (
 
     select * from {{ ref('int_order_geo') }}
-    where customer_latitude is not null and seller_latitude is not null
+    where
+        customer_latitude is not null and seller_latitude is not null
+        and _loaded_at > {{ incremental_watermark() }}
 
 ),
 
@@ -41,6 +46,7 @@ distances as (
         order_id,
         customer_state,
         seller_state,
+        _loaded_at,
         customer_state = seller_state as same_state,
         2 * 6371 * asin(sqrt(
             power(sin(radians(seller_latitude - customer_latitude) / 2), 2)
@@ -61,6 +67,7 @@ select
     t.freight_total,
     dl.days_total as delivery_days,
     r.review_score,
+    d._loaded_at,
     round(100.0 * t.freight_total / nullif(t.order_total, 0), 2) as freight_pct,
     case
         when d.distance_km < 50 then '0000-0050'

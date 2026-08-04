@@ -32,8 +32,11 @@ import argparse
 from datetime import datetime, timedelta
 
 HERE = os.path.dirname(__file__)
-RAW_DIR = os.path.join(HERE, "..", "data", "raw")
-OUT_DIR = os.path.join(HERE, "..", "data", "incoming")
+# Data root is configurable (OLIST_DATA_DIR) so CI / tests can point at a
+# throwaway directory instead of the repo's data/.
+DATA_DIR = os.environ.get("OLIST_DATA_DIR") or os.path.join(HERE, "..", "data")
+RAW_DIR = os.path.join(DATA_DIR, "raw")
+OUT_DIR = os.path.join(DATA_DIR, "incoming")
 
 FMT = "%Y-%m-%d %H:%M:%S"
 
@@ -95,14 +98,18 @@ def rand_ts(start, end):
 
 
 def build_batch(n_orders, start, end, product_ids, seller_ids,
-                new_status, new_payment_type):
+                new_status, new_payment_type, zip_pool=None):
+    # zip_pool: when given, customers draw an existing geolocation zip so the
+    # downstream geo joins resolve (used by the synthetic seed dataset). When
+    # None, zips are random — the real-data drift path, where a brand-new
+    # customer zip may legitimately be absent from geolocation.
     rows = {t: [] for t in COLS}
 
     for _ in range(n_orders):
         order_id = new_id()
         customer_id = new_id()
         city, state = random.choice(CITIES)
-        zip_prefix = str(random.randint(1000, 99999))
+        zip_prefix = random.choice(zip_pool) if zip_pool else str(random.randint(1000, 99999))
 
         # customer (one per order, Olist-style)
         rows["customers"].append({

@@ -16,6 +16,7 @@ select
     order_delivered_carrier_date,
     order_delivered_customer_date,
     order_estimated_delivery_date,
+    _loaded_at,
     extract(epoch from (order_approved_at - order_purchase_timestamp)) / 86400
         as days_approval,
     extract(epoch from (order_delivered_carrier_date - order_approved_at)) / 86400
@@ -26,8 +27,8 @@ select
         as days_total,
     extract(epoch from (order_delivered_customer_date - order_estimated_delivery_date)) / 86400
         as days_delay,
-    order_delivered_customer_date > order_estimated_delivery_date as is_late,
     -- present, correctly ordered, no implausibly-fast stages
+    order_delivered_customer_date > order_estimated_delivery_date as is_late,
     (
         order_approved_at is not null
         and order_delivered_carrier_date is not null

@@ -26,6 +26,7 @@ select
     review_comment_title,
     review_comment_message,
     review_creation_date,
-    review_answer_timestamp
+    review_answer_timestamp,
+    _loaded_at
 from ranked
 where rn = 1
