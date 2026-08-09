@@ -1,8 +1,9 @@
--- NB04: payment-method mix per type ('not_defined' excluded).
+-- NB04: payment-method mix per type. Reads the shared cleaned set
+-- (int_payments_cleaned already drops 'not_defined' + invalid installments),
+-- so this mart and mart_payment_by_order see identical input.
 with payments as (
 
-    select * from {{ ref('stg_order_payments') }}
-    where payment_type != 'not_defined'
+    select * from {{ ref('int_payments_cleaned') }}
 
 )
 

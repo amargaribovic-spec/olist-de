@@ -12,7 +12,11 @@ ranked as (
         *,
         row_number() over (
             partition by order_id
-            order by review_creation_date desc, review_answer_timestamp desc
+            -- review_sk breaks ties deterministically so the picked row never
+            -- depends on scan/insert order (reproducible run-to-run).
+            order by
+                review_creation_date desc, review_answer_timestamp desc,
+                review_sk desc
         ) as rn
     from reviews
 
