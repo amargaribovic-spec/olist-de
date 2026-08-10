@@ -3,8 +3,9 @@
 #
 # Two ingestion modes, built for continuous data arriving from Olist:
 #
-#   ./run.sh fresh        WIPE everything and rebuild as if running the first time
-#                         (down -v -> up -> full load -> dbt build --full-refresh)
+#   ./run.sh fresh        WIPE everything and rebuild from the ORIGINAL 9 CSVs only
+#                         (down -v -> up -> canonical load -> dbt build --full-refresh).
+#                         Batches are NOT replayed — add them on demand with `load`.
 #   ./run.sh build        continue: load only NEW batches, then incremental dbt build
 #
 #   ./run.sh              all: up -> load (full if empty, else new batches) -> build
@@ -15,6 +16,8 @@
 #                         e.g. ./run.sh generate --orders 500 --new-status --seed 42
 #   ./run.sh build-only   dbt deps + dbt build (no loading)
 #   ./run.sh refresh      dbt deps + dbt build --full-refresh (rebuild incrementals)
+#   ./run.sh clean-batches  delete batch files in data/incoming + data/processed
+#                         (regenerable fake data). Pair with `fresh` for a pristine reset.
 #   ./run.sh down         stop containers, keep the data
 #
 set -euo pipefail
@@ -51,9 +54,22 @@ cmd_load() {        # incremental: append only new batches
     $COMPOSE run --rm loader python load/load_raw.py --append
 }
 
-cmd_load_full() {   # clean full load
-    log "full load (truncate + canonical + replay batches)"
+cmd_load_full() {   # clean full load → original 9 CSVs only
+    log "full load (truncate + canonical CSVs only; batches not replayed)"
     $COMPOSE run --rm loader python load/load_raw.py --full
+}
+
+cmd_clean_batches() {   # delete batch files (incoming + processed) — they're regenerable fake data
+    local removed=0
+    for dir in data/incoming data/processed; do
+        for f in "$dir"/*.csv; do
+            [ -e "$f" ] || continue          # no matches -> skip the literal glob
+            rm -f "$f"
+            removed=$((removed + 1))
+        done
+    done
+    log "deleted $removed batch file(s) from data/incoming + data/processed"
+    echo "raw tables still hold their rows — run './run.sh fresh' to rebuild from the 9 canonical CSVs only."
 }
 
 cmd_generate() {    # generate a fake batch into data/incoming/
@@ -104,11 +120,12 @@ case "${1:-all}" in
     build)              cmd_build_incremental ;;
     build-only|dbt)     cmd_build ;;
     refresh)            cmd_up; cmd_build "--full-refresh" ;;
+    clean-batches)      cmd_clean_batches ;;
     all)                cmd_all ;;
     fresh|full-refresh) cmd_fresh ;;
     down)               cmd_down ;;
     *)
-        echo "usage: ./run.sh [all|fresh|build|up|load|load-full|generate ..|build-only|refresh|down]"
+        echo "usage: ./run.sh [all|fresh|build|up|load|load-full|generate ..|build-only|refresh|clean-batches|down]"
         exit 1
         ;;
 esac

@@ -1,9 +1,12 @@
 """
 Load Olist CSVs into the raw landing schema.
 
-    python load/load_raw.py --full      # clean rebuild: (re)create schema, truncate,
-                                        # load the canonical CSVs, then replay every
-                                        # batch in data/processed/ + data/incoming/
+    python load/load_raw.py --full      # clean rebuild → the ORIGINAL Olist data only:
+                                        # (re)create schema, truncate, load the 9
+                                        # canonical CSVs. Batches are NOT applied.
+    python load/load_raw.py --full --replay-batches
+                                        # ...and additionally re-apply accumulated batches
+                                        # from data/processed/ + data/incoming/ (cumulative)
     python load/load_raw.py --append    # incremental: load only NEW batch files from
                                         # data/incoming/ (skips anything already loaded)
 
@@ -143,8 +146,13 @@ def load_batches(conn, directory, move=True):
     return loaded
 
 
-def cmd_full(conn):
-    """Clean rebuild → deterministic cumulative state."""
+def cmd_full(conn, replay_batches=False):
+    """Clean rebuild → the original Olist dataset (the 9 canonical CSVs).
+
+    By default this restores the pristine baseline and nothing else, so every
+    fresh rebuild is identical. Pass replay_batches=True to also re-apply the
+    accumulated batches in data/processed/ + data/incoming/ (reconstruct the
+    cumulative state without keeping the DB volume)."""
     run_ddl(conn)
     print("Truncating raw tables + ledger...")
     for table in KNOWN_TABLES:
@@ -153,7 +161,7 @@ def cmd_full(conn):
         cur.execute("TRUNCATE raw._load_ledger RESTART IDENTITY;")
     conn.commit()
 
-    print("Loading canonical CSVs...")
+    print("Loading canonical CSVs (original Olist data)...")
     for csv_file, table in CSV_TO_TABLE.items():
         path = os.path.join(RAW_DIR, csv_file)
         if os.path.exists(path):
@@ -161,11 +169,14 @@ def cmd_full(conn):
         else:
             print(f"  skip (not found): {csv_file}")
 
-    # Replay accumulated batches so a full rebuild reconstructs the cumulative state.
-    print("Replaying processed batches...")
-    load_batches(conn, PROCESSED_DIR, move=False)
-    print("Loading any pending incoming batches...")
-    load_batches(conn, INCOMING_DIR, move=True)
+    if replay_batches:
+        # Opt-in: reconstruct the cumulative state by re-applying every batch.
+        print("Replaying processed batches...")
+        load_batches(conn, PROCESSED_DIR, move=False)
+        print("Loading any pending incoming batches...")
+        load_batches(conn, INCOMING_DIR, move=True)
+    else:
+        print("Baseline only — batches are added on demand via --append.")
 
 
 def cmd_append(conn):
@@ -180,9 +191,13 @@ def main():
     parser = argparse.ArgumentParser(description="Load Olist CSVs into the raw schema.")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--full", action="store_true",
-                       help="clean rebuild (default): recreate, truncate, load all")
+                       help="clean rebuild (default): recreate, truncate, load the "
+                            "original 9 canonical CSVs only")
     group.add_argument("--append", action="store_true",
                        help="incremental: load only new batches from data/incoming/")
+    parser.add_argument("--replay-batches", action="store_true",
+                        help="with --full: also re-apply accumulated batches from "
+                             "data/processed/ + data/incoming/ (cumulative rebuild)")
     args = parser.parse_args()
 
     conn = get_connection()
@@ -190,7 +205,7 @@ def main():
         if args.append:
             cmd_append(conn)
         else:
-            cmd_full(conn)
+            cmd_full(conn, replay_batches=args.replay_batches)
     finally:
         conn.close()
 
