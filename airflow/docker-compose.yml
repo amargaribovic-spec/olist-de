@@ -1,0 +1,116 @@
+# Containerised Apache Airflow (LocalExecutor) for the olist pipeline.
+#
+# Airflow runs entirely in containers and joins the warehouse's Docker network,
+# so its tasks reach Postgres by service name (DB_HOST=postgres) — the same way
+# the loader and dbt containers already connect. Airflow keeps its OWN metadata
+# database (airflow-postgres); it never touches the analytics warehouse.
+#
+# Prereq — the warehouse must be up first (it creates the shared network + the
+# `postgres` service):
+#     docker compose up -d                                   # from the repo root
+# Then bring up Airflow (from the repo root):
+#     docker compose -f airflow/docker-compose.yml up -d --build
+#
+# UI: http://localhost:8080   (admin / admin)
+
+x-airflow-common: &airflow-common
+  # Only airflow-init declares `build:` (below) so the image is built ONCE and
+  # tagged here; the scheduler/webserver just reuse this local image. Building it
+  # from every service in parallel races on the image name ("already exists").
+  image: olist-airflow:local
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__WEBSERVER__SECRET_KEY: olist-local-dev-secret
+    # --- warehouse connection for the DAG's loader + dbt tasks ---
+    # host.docker.internal is NOT used: we're on the warehouse's own network,
+    # so the analytics Postgres is reachable by its service name.
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    DB_NAME: olist
+    DB_USER: olist
+    DB_PASSWORD: olist
+    DB_SCHEMA: raw
+    DBT_SCHEMA: dbt_amar
+    DBT_PROFILES_DIR: /opt/airflow/olist/dbt
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - airflow-logs:/opt/airflow/logs
+    - ../load:/opt/airflow/olist/load
+    - ../dbt:/opt/airflow/olist/dbt
+    - ../data:/opt/airflow/olist/data
+    - ../sql:/opt/airflow/olist/sql
+  networks:
+    - warehouse
+    - default
+
+services:
+  # Airflow's own metadata DB — separate from the analytics warehouse.
+  airflow-postgres:
+    image: postgres:16
+    container_name: airflow_metadata_db
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 10
+    networks:
+      - default
+
+  # One-shot: migrate the metadata DB and create the admin user, then exit.
+  airflow-init:
+    <<: *airflow-common
+    build:                     # the single place the image is built + tagged
+      context: .
+      dockerfile: Dockerfile
+    container_name: airflow_init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create --username admin --password admin \
+          --firstname admin --lastname admin --role Admin --email admin@example.com || true
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow_scheduler
+    command: scheduler
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow_webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  airflow-db:
+  airflow-logs:
+
+networks:
+  # The warehouse's network, created by the root docker-compose.yml. Airflow
+  # joins it so tasks can reach the `postgres` service by name.
+  warehouse:
+    name: olist-de_default
+    external: true
+  default:
