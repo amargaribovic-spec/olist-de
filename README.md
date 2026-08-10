@@ -106,6 +106,66 @@ set from scratch). It exercises both flows:
    `dbt build`. Proves new data merges in and drift **warns instead of erroring** —
    the pipeline bends, it does not break.
 
+### What CI proves — and what it doesn't
+
+Code and data are kept separate on purpose: the repo versions the **code**, while
+the **data** lives elsewhere — on your disk locally, generated synthetically in
+CI, and in object storage (S3/GCS/SFTP) in production. `.gitignore` enforces this:
+the CSVs are never committed. So "getting the data" never means pulling it from
+Git — the loader reads it from whatever store the environment points at.
+
+Because CI has no real data, it validates the pipeline's **mechanics and
+resilience**, not the business numbers. Testing a data pipeline is layered:
+
+| layer | where it runs | what it checks |
+|---|---|---|
+| unit tests (mock rows) | CI | a single model's SQL logic, in milliseconds |
+| pipeline on synthetic data (`pipeline.yml`) | CI, every PR | it builds, joins resolve, tests pass, drift warns-not-errors |
+| data-quality / freshness / anomaly | scheduled production runs | real incoming batches are sane |
+
+CI answers *"does this change break the pipeline?"* on every PR. Whether the
+**results are correct** is validated separately against the real data (the
+notebook reconciliations). A full production setup would add source-freshness and
+volume-anomaly tests on real batches, and **Slim CI** (`dbt build --select
+state:modified+ --defer` against a stored production manifest) so PRs rebuild only
+what changed — neither is needed here, but both are the natural next steps.
+
+## Orchestration (Airflow)
+
+A containerised **Apache Airflow** (in [`airflow/`](airflow/)) runs the pipeline on
+a schedule. It's plain `docker compose` — no external CLI — so the whole stack is
+version-controlled and comes up with one command:
+
+```bash
+docker compose up -d                                    # warehouse first (creates the network)
+docker compose -f airflow/docker-compose.yml up -d --build
+# UI: http://localhost:8080   (admin / admin)
+```
+
+How it's wired:
+
+- **Its own metadata database.** Airflow keeps its operational state (DAG/task
+  runs, schedules, retries) in a dedicated `airflow-postgres` container — never
+  mixed with the analytics warehouse, so wiping one never touches the other.
+- **On the warehouse's Docker network.** Tasks reach Postgres by service name
+  (`DB_HOST=postgres`), reusing the exact env vars `profiles.yml` and
+  `load/config.py` already read — the DAG carries no connection code.
+- **Isolated tool venv.** dbt + the loader are baked into a separate venv
+  (`/opt/pipeline-venv`) in the Airflow image, so their dependencies never clash
+  with Airflow's; the DAG calls those binaries directly.
+
+The `olist_build` DAG mirrors `./run.sh build`, one CLI step per task:
+
+```
+load_raw --append  →  dbt deps  →  dbt build
+```
+
+It runs `@daily` with `catchup=False`, `max_active_runs=1`, and task retries.
+Every step is idempotent (sha256 ledger, staging dedup, watermark merge), so a
+failed task simply reruns — no cleanup, no double-loading — which is exactly why
+retries are safe. Drop a batch into `data/incoming/` (or `./run.sh generate …`),
+then trigger the DAG to watch it flow through.
+
 ## Structure
 
 ```
@@ -129,6 +189,8 @@ olist-de/
 │   ├── config.py                   # reads .env -> DB connection
 │   ├── load_raw.py                 # append-only CSV -> raw loader (--full / --append)
 │   └── generate_fake_batch.py      # fake batch generator (with drift scenarios)
+├── airflow/                        # containerised Airflow (docker compose):
+│                                   #   olist_build DAG, own image + metadata DB
 └── dbt/                            # dbt project — sources, staging, intermediate,
                                     #   marts, tests, macros (see dbt/README.md)
 ```
