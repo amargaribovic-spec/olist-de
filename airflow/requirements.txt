@@ -1,0 +1,6 @@
+# Pipeline tools, baked into an isolated venv (see Dockerfile), pinned to match
+# the local venv so dbt behaves identically inside Airflow.
+dbt-core==1.10.22
+dbt-postgres==1.9.1
+psycopg2-binary
+python-dotenv
