@@ -97,14 +97,8 @@ as **Required** in the branch-protection rule for `main`
 [`.github/workflows/pipeline.yml`](.github/workflows/pipeline.yml) runs the whole
 pipeline end-to-end on every PR, on a **synthetic dataset** (no real CSVs needed —
 `load/generate_seed_dataset.py` builds a tiny, referentially-consistent 9-table
-set from scratch). It exercises both flows:
-
-1. **fresh** — generate the seed → `load --full` → `dbt build --full-refresh` →
-   test. Proves a clean first-ever run.
-2. **incremental-drift** — a "next-year" batch with a new `order_status`, a new
-   `payment_type` and re-emitted (updated) orders → `load --append` → incremental
-   `dbt build`. Proves new data merges in and drift **warns instead of erroring** —
-   the pipeline bends, it does not break.
+set from scratch): generate the seed → `load --full` → `dbt build --full-refresh`
+→ test. Proves a clean first-ever run builds and passes every test.
 
 ### What CI proves — and what it doesn't
 
@@ -120,7 +114,7 @@ resilience**, not the business numbers. Testing a data pipeline is layered:
 | layer | where it runs | what it checks |
 |---|---|---|
 | unit tests (mock rows) | CI | a single model's SQL logic, in milliseconds |
-| pipeline on synthetic data (`pipeline.yml`) | CI, every PR | it builds, joins resolve, tests pass, drift warns-not-errors |
+| pipeline on synthetic data (`pipeline.yml`) | CI, every PR | it builds, joins resolve, and every test passes |
 | data-quality / freshness / anomaly | scheduled production runs | real incoming batches are sane |
 
 CI answers *"does this change break the pipeline?"* on every PR. Whether the
