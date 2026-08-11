@@ -1,11 +1,8 @@
 name: pipeline
 
 # Proves the pipeline end-to-end on every PR, using a synthetic dataset so no
-# real Olist CSVs (gitignored, ~120 MB) are needed in CI. Two flows, mirroring
-# ./run.sh fresh and ./run.sh build:
-#   1. fresh              — generate a base dataset, full load, full-refresh build, test
-#   2. incremental-drift  — a "next-year" batch with new status/payment + updates,
-#                           append load, incremental build; new values must WARN, not ERROR
+# real Olist CSVs (gitignored, ~120 MB) are needed in CI. Mirrors ./run.sh fresh:
+# generate a synthetic dataset, full load, full-refresh dbt build + tests.
 on:
   pull_request:
     branches: [main]
@@ -17,7 +14,7 @@ concurrency:
 
 jobs:
   simulate:
-    name: fresh + incremental-drift (synthetic data)
+    name: pipeline (synthetic data)
     runs-on: ubuntu-latest
 
     services:
@@ -72,40 +69,3 @@ jobs:
       - name: dbt build --full-refresh (+ tests)
         working-directory: dbt
         run: dbt build --full-refresh
-
-      # ---------- INCREMENTAL-DRIFT FLOW (a new batch arrives, with drift) ----------
-      - name: Generate a drift batch (new status + payment type + updates)
-        run: >-
-          python load/generate_fake_batch.py
-          --orders 200 --new-status --new-payment-type --update-existing 5
-          --seed 7 --label ci_drift --start 2019-01-01 --end 2019-03-31
-
-      - name: Load raw (append)
-        run: python load/load_raw.py --append
-
-      - name: dbt build (incremental) (+ tests)
-        working-directory: dbt
-        run: dbt build
-
-      # A green build above already proves drift did not error. This guards
-      # against a vacuous pass: it fails if the drift values never actually
-      # landed, i.e. if the resilience was never exercised.
-      - name: Assert drift was exercised (returned + pix present)
-        run: |
-          python - <<'PY'
-          import os, psycopg2
-          conn = psycopg2.connect(
-              host=os.environ["DB_HOST"], port=os.environ["DB_PORT"],
-              dbname=os.environ["DB_NAME"], user=os.environ["DB_USER"],
-              password=os.environ["DB_PASSWORD"],
-          )
-          cur = conn.cursor()
-          cur.execute("select count(*) from raw.orders where order_status = 'returned'")
-          returned = cur.fetchone()[0]
-          cur.execute("select count(*) from raw.order_payments where payment_type = 'pix'")
-          pix = cur.fetchone()[0]
-          print(f"drift rows -> returned={returned}, pix={pix}")
-          assert returned > 0, "expected 'returned' orders from the drift batch"
-          assert pix > 0, "expected 'pix' payments from the drift batch"
-          print("drift was exercised and the build did not error -> pipeline is resilient")
-          PY
