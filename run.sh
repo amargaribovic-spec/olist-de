@@ -11,11 +11,11 @@
 #   ./run.sh              all: up -> load (full if empty, else new batches) -> build
 #   ./run.sh up           start postgres and wait until it accepts connections
 #   ./run.sh load         load only new batches from data/incoming/ (append)
-#   ./run.sh load-full    clean full load (truncate + canonical + replay batches)
+#   ./run.sh load-full    clean full load (truncate + 9 canonical CSVs only; no replay)
 #   ./run.sh generate ..  generate a fake Olist batch into data/incoming/
 #                         e.g. ./run.sh generate --orders 500 --new-status --seed 42
 #   ./run.sh build-only   dbt deps + dbt build (no loading)
-#   ./run.sh refresh      dbt deps + dbt build --full-refresh (rebuild incrementals)
+#   ./run.sh refresh      up + dbt deps + dbt build --full-refresh (rebuild incrementals)
 #   ./run.sh clean-batches  delete batch files in data/incoming + data/processed
 #                         (regenerable fake data). Pair with `fresh` for a pristine reset.
 #   ./run.sh down         stop containers, keep the data
@@ -29,7 +29,13 @@ log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 
 wait_for_pg() {
     log "waiting for postgres to accept connections..."
+    local tries=0
     until docker exec olist_postgres pg_isready -U olist -d olist >/dev/null 2>&1; do
+        tries=$((tries + 1))
+        if [ "$tries" -ge 60 ]; then
+            echo "postgres did not become ready after 60s" >&2
+            exit 1
+        fi
         sleep 1
     done
     echo "postgres is ready."
@@ -118,7 +124,7 @@ case "${1:-all}" in
     load-full)          cmd_load_full ;;
     generate)           shift || true; cmd_generate "$@" ;;
     build)              cmd_build_incremental ;;
-    build-only|dbt)     cmd_build ;;
+    build-only)         cmd_build ;;
     refresh)            cmd_up; cmd_build "--full-refresh" ;;
     clean-batches)      cmd_clean_batches ;;
     all)                cmd_all ;;
