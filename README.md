@@ -40,10 +40,11 @@ Both go through `run.sh`, which orchestrates Docker. Other modes:
 | `./run.sh` | full run: up → load (full if empty, else new batches) → build |
 | `./run.sh up` | start Postgres and wait until it accepts connections |
 | `./run.sh load` | load only new batches from `data/incoming/` (append) |
-| `./run.sh load-full` | clean full load (truncate + canonical CSVs + replay batches) |
+| `./run.sh load-full` | clean full load (truncate + 9 canonical CSVs only; no replay) |
 | `./run.sh generate ..` | generate a fake Olist batch into `data/incoming/` (see below) |
 | `./run.sh build-only` | `dbt deps` + `dbt build`, no loading |
 | `./run.sh refresh` | `dbt deps` + `dbt build --full-refresh` |
+| `./run.sh clean-batches` | delete batch files in `data/incoming/` + `data/processed/` |
 | `./run.sh down` | stop containers, keep the data |
 
 ## Continuous ingestion

@@ -16,12 +16,13 @@ Run everything from this `dbt/` folder with the project venv active:
 ```bash
 cd path/to/olist-de/dbt
 source ../venv/bin/activate     # prompt shows (venv)
-dbt deps                        # install packages (codegen, dbt_utils)
+dbt deps                        # install packages (dbt_utils)
 dbt debug                       # verify the Postgres connection is green
 ```
 
-Connection lives in `~/.dbt/profiles.yml` (profile `olist`): host `localhost`,
-port `5544`, db/user/pass all `olist`.
+Connection lives in `dbt/profiles.yml` (profile `olist`), resolved from env vars
+(via `DBT_PROFILES_DIR`): defaults to host `localhost`, port `5544`,
+db/user/pass all `olist`.
 
 ## Everyday commands
 
@@ -51,10 +52,12 @@ and their tests together). Generic tests use the dbt 1.10 `arguments:` syntax.
 - **Reusable generic test** (`tests/generic/sum_equals.sql`) — asserts a column
   sums to a target (optionally per group), applied to every percentage column.
 
-Three checks are intentionally set to **`warn`** (real, tolerated data facts, kept
-visible rather than hidden): one `customer_id` appears on two orders; 8 delivered
-orders have no delivery date (so `is_late` is null); two product categories have no
-English translation.
+Several checks are intentionally set to **`warn`** rather than error. Three are
+tolerated data facts kept visible: one `customer_id` appears on two orders; some
+delivered orders have no delivery date (so `is_late` is null); some product
+categories have no English translation. The `accepted_values` on `order_status`
+and `payment_type` are also `warn`, so a new (drifted) value surfaces without
+failing the build.
 
 ## Linting & formatting with sqlfluff
 
