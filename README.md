@@ -161,6 +161,11 @@ failed task simply reruns — no cleanup, no double-loading — which is exactly
 retries are safe. Drop a batch into `data/incoming/` (or `./run.sh generate …`),
 then trigger the DAG to watch it flow through.
 
+A second DAG, `olist_soak`, is a **demo/soak harness**: every 20 minutes it
+generates its own fake batch and runs the same pipeline, so you can leave it
+running for hours to confirm the pipeline stays healthy under continuous
+ingestion. It's paused by default — unpause it only for a soak test.
+
 ## Structure
 
 ```
@@ -185,7 +190,7 @@ olist-de/
 │   ├── load_raw.py                 # append-only CSV -> raw loader (--full / --append)
 │   └── generate_fake_batch.py      # fake batch generator (with drift scenarios)
 ├── airflow/                        # containerised Airflow (docker compose):
-│                                   #   olist_build DAG, own image + metadata DB
+│                                   #   olist_build + olist_soak DAGs, own image + metadata DB
 └── dbt/                            # dbt project — sources, staging, intermediate,
                                     #   marts, tests, macros (see dbt/README.md)
 ```
