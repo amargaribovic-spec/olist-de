@@ -11,7 +11,8 @@ specific; the last is git/commit hygiene.
 1. **Raw data is sacred.** Never modify the source CSVs. All shaping happens in
    the database / dbt, never in the original files.
 2. **Reproducible & idempotent.** Every script must be safe to re-run and give
-   the same result (the loader TRUNCATEs then reloads — no duplicates, no drift).
+   the same result (raw is append-only; a sha256 load ledger skips already-loaded
+   files, so re-running never double-loads).
 3. **Consistency / code reuse.** Solve the same problem the same way everywhere.
    Don't invent a second pattern for something already done once.
 4. **One job per file/step.** Reading, DDL, loading, and (later) transforming are
@@ -166,7 +167,7 @@ Keep comments purposeful and minimal — this code is read by seniors.
 - Comment the **why** or a non-obvious decision/quirk — never restate what the
   code plainly does.
 - Good: `# 5432/5433 used by local Postgres, so expose on 5544`,
-  `# truncate + reload keeps the load idempotent`,
+  `# sha256 ledger skips already-loaded files (idempotent append)`,
   `# source keeps the original misspelling ("lenght")`.
 - Bad (do not write): obvious/chatty comments like `# your Mac's port`,
   `# read the file`, `# connect to the database`, `# this is a loop`.
