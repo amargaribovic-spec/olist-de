@@ -3,16 +3,16 @@ services:
     image: postgres:16
     container_name: olist_postgres
     environment:
-      POSTGRES_USER: olist
-      POSTGRES_PASSWORD: olist
-      POSTGRES_DB: olist
+      POSTGRES_USER: ${DB_USER:-olist}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-olist}
+      POSTGRES_DB: ${DB_NAME:-olist}
     ports:
       - "5544:5432"   # 5432/5433 are used by local Postgres instances, so expose on 5544
     volumes:
       - olist_pgdata:/var/lib/postgresql/data
 
   # Python CSV -> raw loader. Run on demand:
-  #   docker compose run --rm loader python load/load_raw.py --create
+  #   docker compose run --rm loader python load/load_raw.py --full
   loader:
     build:
       context: .
@@ -23,9 +23,9 @@ services:
     environment:
       DB_HOST: postgres   # reach Postgres over the compose network, not localhost
       DB_PORT: 5432
-      DB_NAME: olist
-      DB_USER: olist
-      DB_PASSWORD: olist
+      DB_NAME: ${DB_NAME:-olist}
+      DB_USER: ${DB_USER:-olist}
+      DB_PASSWORD: ${DB_PASSWORD:-olist}
       DB_SCHEMA: raw
     volumes:
       - ./data:/app/data
@@ -45,10 +45,10 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: olist
-      DB_USER: olist
-      DB_PASSWORD: olist
-      DBT_SCHEMA: dbt_amar
+      DB_NAME: ${DB_NAME:-olist}
+      DB_USER: ${DB_USER:-olist}
+      DB_PASSWORD: ${DB_PASSWORD:-olist}
+      DBT_SCHEMA: ${DBT_SCHEMA:-dbt_amar}
     volumes:
       - ./dbt:/dbt
     working_dir: /dbt
